@@ -1,0 +1,308 @@
+Welcome to this exciting project. We'll be analyzing the trends of the greatest movies over the years.
+
+This project is an in-depth analysis of the movie industry, using data from the IMDB. We will be looking at the top rated movies by genre, average runtime over the years, gross total by year, and predictions for the average gross total in the future. We'll also be diving into the world of movie-making and exploring some interesting facts and figures that you might not have known. For example, did you know that the first motion picture ever created was in the late 19th century and was only a few seconds long? Or that the highest grossing film of all time, adjusted for inflation, is Gone with the Wind?
+
+Throughout this project, we'll be exploring the evolution of the movie industry and the factors that have influenced its growth. We'll also be looking at how the industry has changed over the years, and what the future might hold for the film world.
+
+We'll be using the movies.csv(https://www.kaggle.com/datasets/themrityunjaypathak/imdb-top-100-movies) datasetfrom Kaggle.
+
+The data will be cleaned and processed using R and visualized using ggplot2 and Shiny.
+
+As a cinephile, you'll appreciate the love and care that's gone into creating this project. We'll be taking a deep dive into the movie industry, and we hope you'll enjoy the ride.
+
+# Data Preparation
+
+
+Let's start.
+
+```{r}
+library("tidyverse")
+```
+
+Load the data
+
+```{r}
+movies <- read_csv("Movies/movies.csv")
+head(movies)
+```
+
+Then, we're checking for any missing values in the year_of_release, run_time, and gross_total columns by using the sum() function with the is.na() function.
+
+After that, we are removing any non-numeric characters from the year_of_release, run_time, and gross_total columns, and converting them to their appropriate data types.
+
+```{r}
+# Check for missing values in year_of_release, run_time and gross_total
+sum(is.na(movies$year_of_release))
+sum(is.na(movies$run_time))
+sum(is.na(movies$gross_total))
+```
+
+
+```{r}
+# remove non numeric characters
+movies$year_of_release <- as.numeric(gsub("[^0-9]", "", movies$year_of_release))
+movies$run_time <- as.numeric(gsub("[^0-9]", "", movies$run_time))
+movies$gross_total <- as.numeric(gsub("[^0-9.]", "", movies$gross_total))
+```
+
+
+```{r}
+# Convert the year_of_release, run_time, and gross_total columns to their appropriate data types
+movies$year_of_release <- as.numeric(movies$year_of_release)
+movies$run_time <- as.numeric(movies$run_time)
+movies$gross_total <- as.numeric(gsub("[$,]", "", movies$gross_total))
+```
+
+
+```{r}
+head(movies)
+```
+
+Now we can start exploring!
+
+# Top Rated Movies by Genre 
+
+In this part we are going to be exploring top rated movies by genre. Also since genre column has multiple values we are going to separate them. Then do our analysis.
+
+Now, we're separating the genre column into separate rows for each genre, and grouping the movies by genre, and ordering them by the imdb_rating in descending order. We can see the results by calling the movies_by_genre variable.
+
+```{r}
+# Split the genre column into separate rows for each genre
+movies_split <- movies %>%
+  separate_rows(genre)
+```
+
+
+```{r}
+# Group the movies by genre and order by imdb_rating in descending order
+movies_by_genre <- movies_split %>%
+  group_by(genre) %>%
+  arrange(desc(imdb_rating))
+```
+
+
+```{r}
+# Display the results
+head(movies_by_genre)
+```
+
+We are going to install the *Shiny* package and create a Shiny app. Which will create an interactive dashboard, allowing the user to filter the movies by genre, year, and imdb rating.
+
+```{r}
+library("shiny")
+
+```
+
+We'll start by designing the user interface.
+
+We are going to create an interface that allows us to filter the movies based on Genre, Year and Rating at the same time.
+
+We'll do this by defining the panel features, which will be a **dropdown** menu for Genre and **slidebars** for Year and Rating. So that we will be able choose movies within a certain range of ratings and years instead of specifying a certain value for them.
+
+Then we are going to design the server logic so that the inputs/selections will retrieve the corresponding data from the table, then the app will show us the results.
+
+```{r}
+# Define the user interface
+ui <- fluidPage(
+  titlePanel("IMDB Top Rated Movies"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("genre", "Genre:", choices = unique(movies_by_genre$genre), 
+                  selected = unique(movies_by_genre$genre)[1]),
+      sliderInput("year", "Year:", min = min(movies$year_of_release), max = max(movies$year_of_release), 
+                  value = c(min(movies$year_of_release), max(movies$year_of_release)), step = 1),
+      sliderInput("rating", "IMDB Rating:", min = 0, max = 10, value = c(0, 10), step = 0.1)
+    ),
+    mainPanel(
+      tableOutput("movies_table")
+    )
+  )
+)
+```
+
+
+```{r}
+# Define the server logic
+server <- function(input, output) {
+  filtered_movies <- reactive({
+    movies_by_genre %>%
+      filter(genre == input$genre & 
+               year_of_release >= input$year[1] & year_of_release <= input$year[2] &
+               imdb_rating >= input$rating[1] & imdb_rating <= input$rating[2])
+  })
+  
+  output$movies_table <- renderTable({
+    filtered_movies()
+  })
+}
+```
+
+```{r}
+# Run the application 
+shinyApp(ui = ui, server = server)
+```
+
+The app will create a dashboard where the user is able to filter films by **genre, year of release** and **rating**.
+
+# Average Runtime Over the Years
+In this section we are going to have a look at how the average runtime changed over the years.
+
+We start by grouping the movies by year of release, and calculating the average runtime for each year. Then, we're creating a line chart of the average runtime by year using ggplot2.
+
+
+```{r}
+# Group the movies by year of release and calculate the average runtime
+movies_by_year <- movies %>%
+  group_by(year_of_release) %>%
+  summarise(average_runtime = mean(run_time))
+```
+
+
+```{r}
+# Create a line chart of the average runtime by year using ggplot2
+ggplot(movies_by_year, aes(x = year_of_release, y = average_runtime)) +
+  geom_line(linewidth = 0.7, color = "#3D5472") +
+  labs(x = "Year of Release", y = "Average Runtime (minutes)",
+       title = "Average Runtime by Year of Release") +
+  theme_grey() +
+  theme(title = element_text(size = 12),
+        axis.title = element_text(size = 11),
+        axis.text = element_text(size = 11),
+        plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(breaks = seq(min(movies_by_year$year_of_release),
+                                  max(movies_by_year$year_of_release), by = 10)) +
+  scale_y_continuous(limits = c(min(movies_by_year$average_runtime) - 20, max(movies_by_year$average_runtime) + 20), 
+                     breaks = seq(min(movies_by_year$average_runtime), max(movies_by_year$average_runtime), by = 20)) +
+  geom_smooth(linewidth = 0.9, se = FALSE, method = 'loess') +
+  geom_vline(xintercept = seq(min(movies_by_year$year_of_release), max(movies_by_year$year_of_release), by = 5), color = "gray", linewidth = 0.4) +
+  geom_hline(yintercept = seq(min(movies_by_year$average_runtime), max(movies_by_year$average_runtime), by = 20), color = "gray", linewidth = 0.1) +
+  theme(legend.position = "none")
+```
+
+We can see that the average runtime increases until 1965 then follows a wavy but steady path then starts an increasing trend for these years with an average of more than 2 hours for 2015.
+
+That giant spike at the beginning represents the movie Gone with the Wind with a stunning 238 minutes runtime!
+
+Many of us would assume that average runtime would decrease over years due to the rise of streaming platforms, the increase in short-form content, and the changing attention span of audiences. But since this dataset represents for the top rated movies only, it wouldn't be wise to make assumptions for the whole movie industry.
+
+# Average Gross Total Over the Years
+
+Now we are going to look at how gross totals for top rated movies changed over time and in the next section we are going to make predictions.
+
+We're grouping the movies by year of release, and calculating the average gross total for each year. Then, we're creating a scatterplot with *Plotly* package.
+
+
+```{r}
+# Group the movies by year and calculate the average gross total for each group
+movies_by_year <- movies %>%
+  group_by(year_of_release) %>%
+  summarise(average_gross = mean(gross_total))
+```
+
+
+```{r}
+# Join the two dataframes
+movies_by_year_with_name <- left_join(movies_by_year, movies, by = c("year_of_release" = "year_of_release"))
+```
+
+
+```{r}
+# Remove null values
+movies_by_year_with_name <- na.omit(movies_by_year_with_name)
+```
+
+
+```{r}
+head(movies_by_year_with_name)
+```
+
+
+```{r}
+library("plotly")
+```
+
+Here we are creating a scatter plot with a hover feature to prevent crowdedness of film names.
+```{r}
+# Create the plot
+p <- plot_ly(movies_by_year_with_name, x = ~year_of_release, y = ~average_gross, type = "scatter", 
+             mode = "lines+markers", text = ~movie_name,
+             marker = list(size = 4, color = "black")) %>%
+  layout(xaxis = list(title = "Year of Release"),
+         yaxis = list(title = "Average Gross (in millions)"),
+         title = "Average Gross by Year of Release")
+```
+
+
+```{r}
+p
+```
+
+It's clear that the average gross total has been consistently increasing over the years. This could be due to various factors such as inflation, the growth of the global box office and the increasing popularity of the movie industry.
+
+We also see the massive hit of the Mad Max: Fury Road with a gross total of 543M USD in 2015. Also Slumdog Millionaire (2008), Star Wars: Episode VI - Return of the Jedi (1983), Star Wars: A New Hope (1973) and Gone with the Wind (1939) had massive success in the box office.
+
+We've been able to gain insight into the average runtime and gross total of movies over the years, as well as the top rated movies by genre.
+
+# Predictions for Average Gross Total
+
+In this section, the aim is to predict the average gross total for the next 15 years. We first created a linear model using the year of release and average gross total from our past data. We then used this model to predict the average gross total for the next 15 years and added these predictions to our movies_by_year_with_future dataset
+
+Next, we will create a linear model using this data and use it to make predictions for the next 15 years.
+
+Finally, we will create a line chart that shows the average gross total for each year, along with the predictions for the future 15 years.
+     
+```{r}
+# Creating a dataframe for the future 15 years 
+future_years <- data.frame(year_of_release = (max(movies_by_year$year_of_release) + 1):(max(movies_by_year$year_of_release) + 15))
+```
+
+
+```{r}
+# Fitting the model to the original dataset
+model <- lm(average_gross ~ year_of_release, data = movies_by_year)
+```
+
+
+```{r}
+# Predicting the average gross for the future 15 years
+future_predictions <- predict(model, newdata = future_years)
+```
+
+
+```{r}
+# Combining the original dataset with the predictions for the future
+movies_by_year_with_future <- rbind(movies_by_year, data.frame(year_of_release = future_years$year_of_release, average_gross = future_predictions))
+```
+
+
+```{r}
+# Remove non-finite and missing values from data
+movies_by_year_with_future <- filter(movies_by_year_with_future, is.finite(average_gross))
+movies_by_year_with_future <- filter(movies_by_year_with_future, !is.na(year_of_release))
+```
+
+
+```{r}
+# Create the line chart
+ggplot(data = movies_by_year_with_future, aes(x = year_of_release, y = average_gross)) +
+  geom_line(color = "royal blue") +
+  geom_point(size = 0.4) +
+  geom_smooth(method = lm, se = TRUE, color = "maroon", size = 0.6) +
+  ggtitle("Linear Trend for Average Gross Total by Year") +
+  xlab("Year of Release") +
+  ylab("Average Gross Total (USD)") +
+  theme_minimal() 
+```
+  
+The chart shows a clear upward trend in the average gross total over the years, with predictions for the next 15 years continuing this trend. 
+
+This chart shows that high rated movies will tend to hit big in the box office in the coming years. 
+
+# Conclusions
+From the data and analysis, we can see that the movie industry has gone through various changes over the years. The top rated movies by genre have shifted, the average runtime hasn't changed much, and the gross total has gone through the roof. It's clear that great movies earn great money(not counting the budget)!
+
+As a cinephile, it's exciting to see the industry evolve and change. The movie industry is constantly evolving, and it will be interesting to see how it continues to change in the future. This project offers a glimpse into the past and present of the movie industry, but there's still so much more to explore.
+
+It is important to note that this data only represents a snapshot of the movie industry and should be further analyzed with other data sources for a more comprehensive understanding. 
+
+However it should be also noted that the rise of streaming platforms will make an inevitable affect the way movies are consumed and produced. Streaming services like Netflix and Amazon have disrupted the traditional Hollywood model, allowing for a wider variety of content to be produced and distributed.
